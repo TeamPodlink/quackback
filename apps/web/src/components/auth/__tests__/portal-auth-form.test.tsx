@@ -187,6 +187,22 @@ describe('PortalAuthForm — Stage 1 → Stage 2 dispatch', () => {
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
   })
 
+  it('uses the lookup-returned portal methods before choosing the methods step', async () => {
+    lookupMock.mockResolvedValue({
+      kind: 'methods',
+      authConfig: { password: false, magicLink: true },
+      ssoEnabled: false,
+    })
+    render(<PortalAuthForm authConfig={{ password: true, magicLink: false }} />)
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'user@gmail.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+    await screen.findByRole('button', { name: /continue with email/i })
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument()
+  })
+
   it('redirects to SSO when the lookup returns sso-redirect', async () => {
     lookupMock.mockResolvedValue({ kind: 'sso-redirect' })
     signInOauth2Mock.mockResolvedValue({ data: { url: 'https://idp.example/' }, error: null })

@@ -123,11 +123,15 @@ export function PortalAuthFormInline({
   onModeSwitch,
   onContextChange,
 }: PortalAuthFormInlineProps) {
-  const passwordEnabled = authConfig?.oauth?.password ?? true
-  const magicLinkEnabled = authConfig?.oauth?.magicLink ?? false
+  const [methodsAuthConfig, setMethodsAuthConfig] = useState<Record<string, boolean | undefined>>(
+    authConfig?.oauth ?? {}
+  )
+  const passwordEnabled = methodsAuthConfig.password ?? true
+  const magicLinkEnabled = methodsAuthConfig.magicLink ?? false
   const openSignup = authConfig?.openSignup
-  const methodsDefaultStep: AuthFormStep =
-    !passwordEnabled && magicLinkEnabled ? 'email' : 'credentials'
+  const getMethodsDefaultStep = (config: Record<string, boolean | undefined>): AuthFormStep =>
+    (config.password ?? true) === false && (config.magicLink ?? false) ? 'email' : 'credentials'
+  const methodsDefaultStep = getMethodsDefaultStep(methodsAuthConfig)
 
   // Stage 2 sub-screens. `methods-step` carries the inner step (the
   // existing `AuthFormStep` union — credentials | email | code | forgot
@@ -238,6 +242,7 @@ export function PortalAuthFormInline({
         return
       }
       if (result.kind === 'sso-default') {
+        setMethodsAuthConfig(result.authConfig)
         setView({ stage: 'sso-default' })
         return
       }
@@ -249,7 +254,8 @@ export function PortalAuthFormInline({
         setView({ stage: 'closed-signup' })
         return
       }
-      setView({ stage: 'methods-step', step: methodsDefaultStep })
+      setMethodsAuthConfig(result.authConfig)
+      setView({ stage: 'methods-step', step: getMethodsDefaultStep(result.authConfig) })
     } catch (err) {
       setError((err as Error).message || 'Something went wrong. Please try again.')
     } finally {

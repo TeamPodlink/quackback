@@ -91,8 +91,11 @@ export function PortalAuthForm({
   openSignup,
   onModeSwitch,
 }: PortalAuthFormProps) {
-  const passwordEnabled = authConfig?.password ?? true
-  const magicLinkEnabled = authConfig?.magicLink ?? false
+  const [methodsAuthConfig, setMethodsAuthConfig] = useState<PortalAuthMethods>(
+    authConfig ?? {}
+  )
+  const passwordEnabled = methodsAuthConfig.password ?? true
+  const magicLinkEnabled = methodsAuthConfig.magicLink ?? false
   const oauthProviders = authConfig ? getEnabledOAuthProviders(authConfig, customProviderNames) : []
 
   // Stage 1 + Stage 2 sub-screens. `methods-step` carries the inner
@@ -108,8 +111,9 @@ export function PortalAuthForm({
 
   // Start state: invitation OR initialEmail bypasses Stage 1.
   const skipStage1 = !!(initialEmail || invitationId)
-  const methodsDefaultStep: AuthFormStep =
-    !passwordEnabled && magicLinkEnabled ? 'email' : 'credentials'
+  const getMethodsDefaultStep = (config: PortalAuthMethods): AuthFormStep =>
+    (config.password ?? true) === false && (config.magicLink ?? false) ? 'email' : 'credentials'
+  const methodsDefaultStep = getMethodsDefaultStep(methodsAuthConfig)
   const [view, setView] = useState<View>(
     skipStage1 ? { stage: 'methods-step', step: methodsDefaultStep } : { stage: 'email' }
   )
@@ -191,6 +195,7 @@ export function PortalAuthForm({
         return
       }
       if (result.kind === 'sso-default') {
+        setMethodsAuthConfig(result.authConfig)
         setView({ stage: 'sso-default' })
         return
       }
@@ -204,7 +209,8 @@ export function PortalAuthForm({
         setView({ stage: 'closed-signup' })
         return
       }
-      setView({ stage: 'methods-step', step: methodsDefaultStep })
+      setMethodsAuthConfig(result.authConfig)
+      setView({ stage: 'methods-step', step: getMethodsDefaultStep(result.authConfig) })
     } catch (err) {
       setError((err as Error).message || 'Something went wrong. Please try again.')
     } finally {
