@@ -13,6 +13,8 @@ import { ForbiddenError } from '@/lib/shared/errors'
 const hoisted = vi.hoisted(() => ({
   mockRequireSettings: vi.fn(),
   mockDbUpdate: vi.fn(),
+  mockDbSet: vi.fn(),
+  mockDbWhere: vi.fn(),
   mockAssertNotManaged: vi.fn(),
 }))
 
@@ -50,7 +52,9 @@ describe('updateFeatureFlags — per-key managed-paths gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     hoisted.mockRequireSettings.mockResolvedValue({ id: 'org_x', featureFlags: null })
-    hoisted.mockDbUpdate.mockReturnValue({ set: () => ({ where: vi.fn() }) })
+    hoisted.mockDbWhere.mockResolvedValue(undefined)
+    hoisted.mockDbSet.mockReturnValue({ where: hoisted.mockDbWhere })
+    hoisted.mockDbUpdate.mockReturnValue({ set: hoisted.mockDbSet })
   })
 
   it('asserts every input key, prefixed with features.', async () => {
@@ -77,5 +81,13 @@ describe('updateFeatureFlags — per-key managed-paths gate', () => {
     hoisted.mockAssertNotManaged.mockResolvedValue(undefined)
     const result = await updateFeatureFlags({ analytics: true })
     expect(result.analytics).toBe(true)
+  })
+
+  it('enables public help center config when the help center flag is enabled', async () => {
+    hoisted.mockAssertNotManaged.mockResolvedValue(undefined)
+    await updateFeatureFlags({ helpCenter: true })
+    const payload = hoisted.mockDbSet.mock.calls[0][0]
+    expect(JSON.parse(payload.featureFlags).helpCenter).toBe(true)
+    expect(JSON.parse(payload.helpCenterConfig).enabled).toBe(true)
   })
 })

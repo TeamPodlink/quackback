@@ -919,9 +919,18 @@ export async function updateFeatureFlags(input: Partial<FeatureFlags>): Promise<
     ...(org.featureFlags ? JSON.parse(org.featureFlags) : {}),
   }
   const updated = { ...current, ...input }
+  const updateData: Partial<typeof settings.$inferInsert> = {
+    featureFlags: JSON.stringify(updated),
+  }
+
+  if (input.helpCenter === true) {
+    const helpCenterConfig = parseJsonConfig(org.helpCenterConfig, DEFAULT_HELP_CENTER_CONFIG)
+    updateData.helpCenterConfig = JSON.stringify({ ...helpCenterConfig, enabled: true })
+  }
+
   await db
     .update(settings)
-    .set({ featureFlags: JSON.stringify(updated) })
+    .set(updateData)
     .where(eq(settings.id, org.id))
   await invalidateSettingsCache()
   return updated
