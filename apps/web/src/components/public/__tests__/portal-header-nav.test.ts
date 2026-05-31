@@ -11,4 +11,13 @@ describe('buildNavItems', () => {
     const items = buildNavItems({ helpCenterEnabled: true })
     expect(items.map((i) => i.to)).toEqual(['/', '/roadmap', '/changelog', '/hc'])
   })
+
+  it('hides roadmap and changelog tabs when disabled', () => {
+    const items = buildNavItems({
+      changelogEnabled: false,
+      helpCenterEnabled: true,
+      roadmapEnabled: false,
+    })
+    expect(items.map((i) => i.to)).toEqual(['/', '/hc'])
+  })
 })

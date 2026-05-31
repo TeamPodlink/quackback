@@ -19,16 +19,26 @@ export type PortalNavItem = (typeof NAV_ITEMS_BASE)[number] | typeof NAV_ITEM_HE
 
 /**
  * Returns the nav items shown in the portal header.
- * Feedback/roadmap/changelog are always shown; a Help tab is appended when
- * the help center feature is enabled.
+ * Feedback is always shown; Roadmap/Changelog can be hidden from portal config;
+ * a Help tab is appended when the help center feature is enabled.
  */
 export function buildNavItems({
+  changelogEnabled = true,
   helpCenterEnabled,
+  roadmapEnabled = true,
 }: {
+  changelogEnabled?: boolean
   helpCenterEnabled: boolean
+  roadmapEnabled?: boolean
 }): readonly PortalNavItem[] {
+  const baseItems = NAV_ITEMS_BASE.filter((item) => {
+    if (item.to === '/roadmap') return roadmapEnabled
+    if (item.to === '/changelog') return changelogEnabled
+    return true
+  })
+
   if (helpCenterEnabled) {
-    return [...NAV_ITEMS_BASE, NAV_ITEM_HELP]
+    return [...baseItems, NAV_ITEM_HELP]
   }
-  return NAV_ITEMS_BASE
+  return baseItems
 }

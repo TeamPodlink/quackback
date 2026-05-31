@@ -61,8 +61,13 @@ export function PortalHeader({
 
   const helpCenterEnabled =
     !!settings?.featureFlags?.helpCenter && !!settings?.helpCenterConfig?.enabled
+  const portalFeatures = settings?.publicPortalConfig?.features
   const onHelpPages = pathname === '/hc' || pathname.startsWith('/hc/')
-  const navItems = buildNavItems({ helpCenterEnabled })
+  const navItems = buildNavItems({
+    changelogEnabled: portalFeatures?.changelog ?? true,
+    helpCenterEnabled,
+    roadmapEnabled: portalFeatures?.roadmap ?? true,
+  })
 
   // Hide Log in / Sign up when no portal sign-in surface is usable.
   // Team members can still reach /admin/login directly.

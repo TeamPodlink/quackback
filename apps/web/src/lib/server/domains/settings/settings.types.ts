@@ -195,6 +195,10 @@ export interface PortalFeatures {
   allowDeleteAfterEngagement: boolean
   /** Show public edit history on posts */
   showPublicEditHistory: boolean
+  /** Whether to show the Roadmap tab in the public portal header */
+  roadmap?: boolean
+  /** Whether to show the Changelog tab in the public portal header */
+  changelog?: boolean
 }
 
 /**
@@ -275,6 +279,8 @@ export const DEFAULT_PORTAL_CONFIG: PortalConfig = {
     allowDeleteAfterEngagement: false,
     showPublicEditHistory: false,
     allowAnonymous: true,
+    roadmap: true,
+    changelog: true,
   },
   welcomeCard: {
     enabled: false,
