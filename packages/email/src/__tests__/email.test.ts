@@ -19,6 +19,8 @@ function withCleanEnv() {
     'EMAIL_SMTP_PASS',
     'EMAIL_RESEND_API_KEY',
     'RESEND_API_KEY',
+    'EMAIL_RESEND_REQUESTS_PER_SECOND',
+    'RESEND_REQUESTS_PER_SECOND',
     'EMAIL_FROM',
   ]
 

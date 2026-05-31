@@ -53,6 +53,95 @@ export type EmailResult = { sent: boolean }
 
 type EmailProvider = 'smtp' | 'resend' | 'console'
 
+const DEFAULT_RESEND_REQUESTS_PER_SECOND = 4
+
+class EmailSendError extends Error {
+  provider: EmailProvider
+  status?: number
+  code?: string
+
+  constructor(
+    message: string,
+    options: { provider: EmailProvider; status?: number; code?: string; name?: string }
+  ) {
+    super(message)
+    this.provider = options.provider
+    if (options.status !== undefined) this.status = options.status
+    if (options.code !== undefined) this.code = options.code
+    if (options.name) this.name = options.name
+  }
+}
+
+function getErrorString(error: unknown, key: string): string | undefined {
+  if (!error || typeof error !== 'object' || !(key in error)) return undefined
+  const value = (error as Record<string, unknown>)[key]
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function getErrorNumber(error: unknown, key: string): number | undefined {
+  if (!error || typeof error !== 'object' || !(key in error)) return undefined
+  const value = (error as Record<string, unknown>)[key]
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function toEmailSendError(provider: EmailProvider, error: unknown): EmailSendError {
+  if (error instanceof EmailSendError) return error
+
+  const message =
+    getErrorString(error, 'message') ?? (error instanceof Error ? error.message : 'Unknown error')
+  const code = getErrorString(error, 'name') ?? getErrorString(error, 'code')
+  const status = getErrorNumber(error, 'statusCode') ?? getErrorNumber(error, 'status')
+
+  return new EmailSendError(`Resend API error: ${message}${code ? ` (${code})` : ''}`, {
+    provider,
+    status,
+    code,
+    name: code,
+  })
+}
+
+function getResendRequestsPerSecond(): number {
+  const raw = getEnv('EMAIL_RESEND_REQUESTS_PER_SECOND') ?? getEnv('RESEND_REQUESTS_PER_SECOND')
+  if (!raw) return DEFAULT_RESEND_REQUESTS_PER_SECOND
+
+  const parsed = Number.parseFloat(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_RESEND_REQUESTS_PER_SECOND
+  return parsed
+}
+
+function getResendRequestSpacingMs(): number {
+  return Math.ceil(1000 / getResendRequestsPerSecond())
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+let resendRequestChain: Promise<void> = Promise.resolve()
+let nextResendRequestAt = 0
+
+async function withResendRateLimit<T>(operation: () => Promise<T>): Promise<T> {
+  const run = resendRequestChain.then(async () => {
+    const waitMs = Math.max(0, nextResendRequestAt - Date.now())
+    if (waitMs > 0) await sleep(waitMs)
+
+    nextResendRequestAt = Date.now() + getResendRequestSpacingMs()
+    return operation()
+  })
+
+  resendRequestChain = run.then(
+    () => undefined,
+    () => undefined
+  )
+
+  return run
+}
+
 export function isEmailConfigured(): boolean {
   return getProvider() !== 'console'
 }
@@ -136,15 +225,19 @@ async function sendEmail(options: {
   }
 
   if (provider === 'resend') {
-    const result = await getResend().emails.send({
-      from: getEmailFrom(),
-      to: options.to,
-      subject: options.subject,
-      react: options.react,
+    const result = await withResendRateLimit(() =>
+      getResend().emails.send({
+        from: getEmailFrom(),
+        to: options.to,
+        subject: options.subject,
+        react: options.react,
+      })
+    ).catch((error) => {
+      throw toEmailSendError('resend', error)
     })
     if (result.error) {
       console.error(`[Email] Resend API error:`, JSON.stringify(result.error, null, 2))
-      throw new Error(`Resend API error: ${result.error.message} (${result.error.name})`)
+      throw toEmailSendError('resend', result.error)
     }
     console.log(`[Email] Sent via Resend to ${options.to}, id: ${result.data?.id}`)
     return { sent: true }
